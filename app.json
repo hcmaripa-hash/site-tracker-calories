@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Calorie Tracker",
+    "slug": "site-tracker-calories",
+    "web": {
+      "publicPath": "./"
+    },
+    "plugins": ["expo-font"]
+  }
+}
