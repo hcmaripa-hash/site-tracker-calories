@@ -43,6 +43,7 @@ export interface AppContextType {
   obterAlimentacao: (data: string) => Promise<any[]>;
   removerAlimentacao: (id: string) => Promise<void>;
   obterTotalCalorias: (dataInicial: Date, filtro: 'dia' | 'semana' | 'mes') => Promise<number>;
+  obterCaloriasPorDiaMes: () => Promise<{ [key: string]: number }>;
   salvarInformacoesFisicas: (info: any) => Promise<void>;
   obterInformacoesFisicas: () => Promise<any>;
   adicionarItemBase: (item: any) => Promise<void>;
@@ -72,8 +73,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       const baseStr = await AsyncStorage.getItem('baseNutricional');
       
       if (alimentacoesStr) {
-        setAlimentacoes(JSON.parse(alimentacoesStr));
+        let alimentacoesData = JSON.parse(alimentacoesStr);
+        
+        // Migrar dados antigos que não têm data
+        const hoje = new Date().toISOString().split('T')[0];
+        alimentacoesData = alimentacoesData.map((a: any) => ({
+          ...a,
+          data: a.data || hoje // Se não tem data, assume hoje
+        }));
+        
+        setAlimentacoes(alimentacoesData);
+        
+        // Salvar novamente com as datas migradas
+        await AsyncStorage.setItem('alimentacoes', JSON.stringify(alimentacoesData));
       }
+      
       if (infosStr) {
         setInformacoesFisicas(JSON.parse(infosStr));
       }
@@ -99,7 +113,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const adicionarAlimentacao = async (alimentacao: any) => {
     try {
-      const novasAlimentacoes = [...alimentacoes, alimentacao];
+      // Garantir que sempre tenha uma data
+      const alimentacaoComData = {
+        ...alimentacao,
+        data: alimentacao.data || new Date().toISOString().split('T')[0]
+      };
+      
+      const novasAlimentacoes = [...alimentacoes, alimentacaoComData];
       setAlimentacoes(novasAlimentacoes);
       await AsyncStorage.setItem('alimentacoes', JSON.stringify(novasAlimentacoes));
     } catch (error) {
@@ -163,6 +183,47 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  const obterCaloriasPorDiaMes = async (): Promise<{ [key: string]: number }> => {
+    try {
+      const alimentacoesStr = await AsyncStorage.getItem('alimentacoes');
+      if (!alimentacoesStr) return {};
+
+      const todasAlimentacoes = JSON.parse(alimentacoesStr);
+      const hoje = new Date();
+      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+
+      const toDateStr = (d: Date) => d.toISOString().split('T')[0];
+      const inicioStr = toDateStr(primeiroDiaMes);
+      const fimStr = toDateStr(ultimoDiaMes);
+
+      const alimentacoesMes = todasAlimentacoes.filter((a: any) => {
+        const dataStr = a.data;
+        return dataStr >= inicioStr && dataStr <= fimStr;
+      });
+
+      const caloriasPorDia: { [key: string]: number } = {};
+
+      // Inicializar todos os dias do mês com 0
+      for (let d = new Date(primeiroDiaMes); d <= ultimoDiaMes; d.setDate(d.getDate() + 1)) {
+        const diaStr = d.getDate().toString().padStart(2, '0');
+        caloriasPorDia[diaStr] = 0;
+      }
+
+      // Somar calorias por dia
+      alimentacoesMes.forEach((a: any) => {
+        const data = new Date(a.data + 'T00:00:00');
+        const dia = data.getDate().toString().padStart(2, '0');
+        caloriasPorDia[dia] += a.calorias;
+      });
+
+      return caloriasPorDia;
+    } catch (error) {
+      console.error('Erro ao obter calorias por dia do mês:', error);
+      return {};
+    }
+  };
+
   const salvarInformacoesFisicas = async (info: any) => {
     try {
       setInformacoesFisicas(info);
@@ -218,6 +279,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     obterAlimentacao,
     removerAlimentacao,
     obterTotalCalorias,
+    obterCaloriasPorDiaMes,
     salvarInformacoesFisicas,
     obterInformacoesFisicas,
     adicionarItemBase,

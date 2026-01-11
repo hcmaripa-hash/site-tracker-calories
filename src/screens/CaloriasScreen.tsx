@@ -8,6 +8,7 @@ export default function CaloriasScreen() {
   const [calorias, setCalorias] = useState(0);
   const [metaDiaria, setMetaDiaria] = useState(2000);
   const [informacoesFisicas, setInformacoesFisicas] = useState<any>(null);
+  const [caloriasPorDia, setCaloriasPorDia] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     carregarDados();
@@ -25,7 +26,13 @@ export default function CaloriasScreen() {
       }
     }
 
-    calcularCalorias();
+    if (filtro === 'mes') {
+      const caloriasDia = await context.obterCaloriasPorDiaMes();
+      setCaloriasPorDia(caloriasDia);
+      setCalorias(Object.values(caloriasDia).reduce((sum, cal) => sum + cal, 0));
+    } else {
+      calcularCalorias();
+    }
   };
 
   const calcularCalorias = async () => {
@@ -202,6 +209,31 @@ export default function CaloriasScreen() {
           </View>
           <Text style={styles.percentualTexto}>{getPercentualMeta()}% da meta</Text>
         </View>
+
+        {filtro === 'mes' && (
+          <View style={styles.diasContainer}>
+            <Text style={styles.diasTitle}>Calorias por Dia</Text>
+            <View style={styles.diasGrid}>
+              {Object.entries(caloriasPorDia).map(([dia, cal]) => (
+                <View key={dia} style={styles.diaItem}>
+                  <Text style={styles.diaNumero}>{dia}</Text>
+                  <Text style={styles.diaCalorias}>{cal}</Text>
+                  <View style={styles.diaBarra}>
+                    <View
+                      style={[
+                        styles.diaBarraFill,
+                        {
+                          width: `${Math.min((cal / metaDiaria) * 100, 100)}%`,
+                          backgroundColor: cal > metaDiaria ? '#ff6b6b' : cal > metaDiaria * 0.9 ? '#FFC107' : '#4CAF50',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {informacoesFisicas && (
           <View style={styles.infoSalvaContainer}>
@@ -470,5 +502,58 @@ const styles = StyleSheet.create({
   dicaDestaque: {
     fontWeight: 'bold',
     color: '#FF9800',
+  },
+  diasContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  diasTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  diasGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  diaItem: {
+    width: '18%', // Aproximadamente 5 itens por linha
+    alignItems: 'center',
+    marginBottom: 15,
+    padding: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  diaNumero: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  diaCalorias: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  diaBarra: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  diaBarraFill: {
+    height: '100%',
+    borderRadius: 2,
   },
 });
